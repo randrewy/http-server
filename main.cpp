@@ -11,14 +11,13 @@ using namespace std;
 
 
 enum {
-    PORT = 8083,
+    PORT = 8080,
     BACKLOG = -1,
     LISTENER_OPTS = LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE,
 };
 
 void conn_eventcb(struct bufferevent *bev, short events, void*)
 {
-    cout << "event callback\n";
     if (events & BEV_EVENT_ERROR) {
         cerr << "Error from bufferevent";
     }
@@ -27,12 +26,30 @@ void conn_eventcb(struct bufferevent *bev, short events, void*)
     }
 }
 
+void conn_writecb(struct bufferevent *bev, void*)
+{
+    struct evbuffer *output = bufferevent_get_output(bev);
+    if (evbuffer_get_length(output) == 0 && BEV_EVENT_EOF ) {
+        bufferevent_free(bev);
+    }
+}
+
 void conn_readcb(struct bufferevent *bev, void*)
 {
-    evbuffer *input = bufferevent_get_input(bev);
+    bufferevent_setcb(bev, NULL, conn_writecb, conn_eventcb, NULL);
+    bufferevent_enable(bev, EV_WRITE);
+
+
     evbuffer *output = bufferevent_get_output(bev);
 
-    evbuffer_add_buffer(output, input);
+    char  response[]=   "HTTP/1.0 200 OK\r\n"
+                        "Content-Type: text/html\r\n"
+                        "Content-Length: %d\r\n\r\n%s";
+    char  body[]    =   "<HTML><TITLE>Test</TITLE>\r\n"
+                        "<BODY><P>Sample answer\r\n"
+                        "</BODY></HTML>\r\n";
+
+    evbuffer_add_printf(output, response, strlen(body), body);
 }
 
 void accept_conn_cb(struct evconnlistener*, evutil_socket_t fd, struct sockaddr*, int, void *data)
@@ -45,7 +62,7 @@ void accept_conn_cb(struct evconnlistener*, evutil_socket_t fd, struct sockaddr*
         return;
     }
     bufferevent_setcb(bev, conn_readcb, NULL, conn_eventcb, NULL);
-    if (bufferevent_enable(bev, EV_READ | EV_WRITE) == -1) {
+    if (bufferevent_enable(bev, EV_READ) == -1) {
         cerr << "Error enabling bufferevent!\n";
         event_base_loopbreak(base);
         return;
