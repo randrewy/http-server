@@ -16,19 +16,8 @@ enum Status {
     NOT_FOUND = 404,
     BAD_REQUEST = 405,
 };
-
-struct httpHeader {
-    Status status;
-    string contentType;
-    int contentLenght;
-
-    httpHeader(Status s, string content, int len) : status(s), contentType(content), contentLenght(len) {}
-
-    static const char* server;
-    static const char* connection;
-};
-const char* httpHeader::server = "TP-HL-SERVER";
-const char* httpHeader::connection = "close";
+const char* SERVER = "TP-HL-SERVER";
+const char* CONNECTION= "close";
 
 const char* statusMessgae(const Status& s)
 {
@@ -44,7 +33,7 @@ const char* statusMessgae(const Status& s)
 }
 
 
-inline void writeHeader(bufferevent *bev, const httpHeader& h)
+inline void writeHeader(bufferevent *bev, Status s, const char* type, int len)
 {
     evbuffer *output = bufferevent_get_output(bev);
 
@@ -56,8 +45,8 @@ inline void writeHeader(bufferevent *bev, const httpHeader& h)
                         "Date: %s\r\n"
                         "\r\n";
     const time_t timer = time(NULL);
-    evbuffer_add_printf(output, headers, statusMessgae(h.status), h.contentType.c_str(),
-                        h.contentLenght, httpHeader::server, httpHeader::connection, ctime(&timer));
+    evbuffer_add_printf(output, headers, statusMessgae(s), type,
+                        len, SERVER, CONNECTION, ctime(&timer));
 }
 
 
@@ -70,9 +59,7 @@ void sampleResponse(bufferevent *bev)
                         "<BODY><P>Sample answer\r\n"
                         "</BODY></HTML>\r\n";
 
-    httpHeader header = httpHeader(OK, "text/html", strlen(body));
-    writeHeader(bev, header);
-
+    writeHeader(bev, OK, "text/html", strlen(body));
     evbuffer_add(output, body, strlen(body));
 }
 
