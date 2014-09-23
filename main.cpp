@@ -5,18 +5,171 @@
 #include <netinet/in.h>
 #include <cstring>
 #include <errno.h>
-
+#include <time.h>
+#include <algorithm>
+#include <string>
 
 using namespace std;
 
+enum Status {
+    OK = 200,
+    NOT_FOUND = 404,
+    BAD_REQUEST = 405,
+};
+
+struct httpHeader {
+    Status status;
+    string contentType;
+    int contentLenght;
+
+    httpHeader(Status s, string content, int len) : status(s), contentType(content), contentLenght(len) {}
+
+    static const char* server;
+    static const char* connection;
+};
+const char* httpHeader::server = "TP-HL-SERVER";
+const char* httpHeader::connection = "close";
+
+const char* statusMessgae(const Status& s)
+{
+    switch(s) {
+    case OK:
+        return "200 OK";
+    case NOT_FOUND:
+        return "404 Not Found";
+    case BAD_REQUEST:
+        return "405 Method Not Allowed";
+    }
+    return "500 internal error";
+}
+
+
+inline void writeHeader(bufferevent *bev, const httpHeader& h)
+{
+    evbuffer *output = bufferevent_get_output(bev);
+
+    char  headers[]=    "HTTP/1.0 %s\r\n"
+                        "Content-Type: %s\r\n"
+                        "Content-Length: %d\r\n"
+                        "Server: %s\r\n"
+                        "Connection: %s\r\n"
+                        "Date: %s\r\n"
+                        "\r\n";
+    const time_t timer = time(NULL);
+    evbuffer_add_printf(output, headers, statusMessgae(h.status), h.contentType.c_str(),
+                        h.contentLenght, httpHeader::server, httpHeader::connection, ctime(&timer));
+}
+
+
+
+void sampleResponse(bufferevent *bev)
+{
+    evbuffer *output = bufferevent_get_output(bev);
+
+    char  body[]    =   "<HTML><TITLE>Test</TITLE>\r\n"
+                        "<BODY><P>Sample answer\r\n"
+                        "</BODY></HTML>\r\n";
+
+    httpHeader header = httpHeader(OK, "text/html", strlen(body));
+    writeHeader(bev, header);
+
+    evbuffer_add(output, body, strlen(body));
+}
+
+void writeBadRequest(bufferevent *bev)
+{
+    evbuffer *output = bufferevent_get_output(bev);
+
+    char  response[]=   "HTTP/1.0 405 Method Not Allowed\r\n"
+                        "Content-Type: text/html\r\n"
+                        "Content-Length: %d\r\n"
+                        "\r\n"
+                        "%s";
+    char  body[]    =   "405 Not Allowed\r\n";
+
+    evbuffer_add_printf(output, response, 17, body);
+}
+
+
+
+
+enum RequestMethod{
+    GET,
+    HEAD,
+    UNSUPPORTED,
+};
+
+RequestMethod stringToRequestMethod(const string& s) {
+    if(s == "GET") {
+        return GET;
+    } else if (s == "HEAD") {
+        return HEAD;
+    } else {
+        return UNSUPPORTED;
+    }
+}
+
+struct RequestInfo{
+    RequestMethod method;
+    string path;
+
+    RequestInfo(const RequestMethod& m, const string& p) : method(m), path(p) {}
+    static RequestInfo BAD_REQUEST;
+};
+RequestInfo RequestInfo::BAD_REQUEST = RequestInfo(UNSUPPORTED, "");
+
+
+RequestInfo getRequestInfo(const string& line)
+{
+    size_t mp = line.find(" ");
+    string method = string(line, 0, mp);
+
+    size_t pp = line.find(" ", mp+1);
+    string path = string(line, mp+1, pp-mp);
+
+    if (line.find(" ", pp+1) != string::npos) { // extra spaces in request
+        return RequestInfo::BAD_REQUEST;
+    } else {
+        return RequestInfo(stringToRequestMethod(method), path);
+    }
+}
+
+
+void createResponse(bufferevent *bev)
+{
+    evbuffer *in = bufferevent_get_input(bev);
+    size_t sz = 0;
+    RequestInfo rinf = getRequestInfo(string(evbuffer_readln(in, &sz, EVBUFFER_EOL_CRLF)));
+
+    if(sz !=0) {
+        switch (rinf.method) {
+        case HEAD:
+            sampleResponse(bev);
+            break;
+
+        case GET:
+            sampleResponse(bev);
+            break;
+
+        case UNSUPPORTED :
+            writeBadRequest(bev);
+        }
+    }
+}
+
+
+
+
+
+
 
 enum {
-    PORT = 8080,
+    PORT = 8081,
     BACKLOG = -1,
     LISTENER_OPTS = LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE,
 };
 
-void conn_eventcb(struct bufferevent *bev, short events, void*)
+void conn_eventcb(bufferevent *bev, short events, void*)
 {
     if (events & BEV_EVENT_ERROR) {
         cerr << "Error from bufferevent";
@@ -26,7 +179,7 @@ void conn_eventcb(struct bufferevent *bev, short events, void*)
     }
 }
 
-void conn_writecb(struct bufferevent *bev, void*)
+void conn_writecb(bufferevent *bev, void*)
 {
     struct evbuffer *output = bufferevent_get_output(bev);
     if (evbuffer_get_length(output) == 0 && BEV_EVENT_EOF ) {
@@ -34,25 +187,16 @@ void conn_writecb(struct bufferevent *bev, void*)
     }
 }
 
-void conn_readcb(struct bufferevent *bev, void*)
+void conn_readcb(bufferevent *bev, void*)
 {
+    createResponse(bev);
+
     bufferevent_setcb(bev, NULL, conn_writecb, conn_eventcb, NULL);
     bufferevent_enable(bev, EV_WRITE);
 
-
-    evbuffer *output = bufferevent_get_output(bev);
-
-    char  response[]=   "HTTP/1.0 200 OK\r\n"
-                        "Content-Type: text/html\r\n"
-                        "Content-Length: %d\r\n\r\n%s";
-    char  body[]    =   "<HTML><TITLE>Test</TITLE>\r\n"
-                        "<BODY><P>Sample answer\r\n"
-                        "</BODY></HTML>\r\n";
-
-    evbuffer_add_printf(output, response, strlen(body), body);
 }
 
-void accept_conn_cb(struct evconnlistener*, evutil_socket_t fd, struct sockaddr*, int, void *data)
+void accept_conn_cb( evconnlistener*, evutil_socket_t fd, sockaddr*, int, void *data)
 {
     event_base *base = static_cast<event_base*>(data);
     bufferevent *bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE);
@@ -69,7 +213,7 @@ void accept_conn_cb(struct evconnlistener*, evutil_socket_t fd, struct sockaddr*
     }
 }
 
-void accept_error_cb(struct evconnlistener *listener, void*)
+void accept_error_cb(evconnlistener *listener, void*)
 {
     event_base *base = evconnlistener_get_base(listener);
     int error = EVUTIL_SOCKET_ERROR();
