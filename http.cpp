@@ -6,8 +6,10 @@ const char* FORBIDDEN_MSG = "405 Forbidden";
 const int   FORBIDDEN_LEN = 13;
 const char* NOT_FOUND_MSG = "404 Not found";
 const int   NOT_FOUND_LEN = 13;
+const char* CRLF = "\r\n";
 
 const RequestInfo RequestInfo::BAD_REQUEST = RequestInfo(UNSUPPORTED, "");
+
 std::map<std::string, const char*> CONTENTS =   {{"html","text/html"},   {"css", "text/css"},   {"js", "application/javascript"},
                                                  {"jpeg", "image/jpeg"}, {"jpg", "image/jpeg"}, {"png", "image/png"},
                                                  {"gif", "image/gif"},   {"swf",  "application/x-shockwave-flash"}
@@ -117,7 +119,7 @@ inline void writeHeader(bufferevent *bev, Status s, const ContentType& t, int le
                         "Content-Length: %d\r\n"
                         "Server: %s\r\n"
                         "Connection: %s\r\n"
-                        "Date: %s\r\n\r\n";
+                        "Date: %s\r\n";
     const time_t timer = time(NULL);
     evbuffer_add_printf(output, headers, statusMessgae(s), contentTypeString(t),
                         len, SERVER, CONNECTION, ctime(&timer));
@@ -177,7 +179,7 @@ void writeResponse(bufferevent *bev, const char* path, RequestMethod method)
     if(method == GET) {
         evbuffer_add_file(output, fd, 0, st.st_size);
     } else {
-        const char* CRLF = "\r\n";
+        // ctime gives only /n so we'll add proper CRLF
         evbuffer_add(output, CRLF, 2);
     }
 }
