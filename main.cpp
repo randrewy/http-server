@@ -37,7 +37,7 @@ inline void writeHeader(bufferevent *bev, Status s, const char* type, int len)
 {
     evbuffer *output = bufferevent_get_output(bev);
 
-    char  headers[]=    "HTTP/1.0 %s\r\n"
+    char  headers[]=    "HTTP/1.1 %s\r\n"
                         "Content-Type: %s\r\n"
                         "Content-Length: %d\r\n"
                         "Server: %s\r\n"
@@ -122,7 +122,7 @@ RequestInfo getRequestInfo(const string& line)
 }
 
 
-void createResponse(bufferevent *bev)
+inline void createResponse(bufferevent *bev)
 {
     evbuffer *in = bufferevent_get_input(bev);
     size_t sz = 0;
@@ -151,7 +151,7 @@ void createResponse(bufferevent *bev)
 
 
 enum {
-    PORT = 8081,
+    PORT = 8080,
     BACKLOG = -1,
     LISTENER_OPTS = LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE,
 };
@@ -211,7 +211,7 @@ void accept_error_cb(evconnlistener *listener, void*)
 
 int main()
 {
-    cout << "Hello Server!\n";
+    cout << "Hello from " << SERVER <<"!\n";
 
     event_base *base;
     evconnlistener *listener;
