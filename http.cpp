@@ -1,4 +1,7 @@
 #include "http.h"
+#include <iostream>
+#include <sys/stat.h>
+#include <fcntl.h>
 using namespace std;
 
 
@@ -10,30 +13,30 @@ bool check_path(const char* path);
 
 void urlDecode(char *dst, const char *src)
 {
-        char a, b;
-        while (*src) {
-                if ((*src == '%') &&
-                    ((a = src[1]) && (b = src[2])) &&
-                    (isxdigit(a) && isxdigit(b))) {
-                        if (a >= 'a')
-                                a -= 'a'-'A';
-                        if (a >= 'A')
-                                a -= ('A' - 10);
-                        else
-                                a -= '0';
-                        if (b >= 'a')
-                                b -= 'a'-'A';
-                        if (b >= 'A')
-                                b -= ('A' - 10);
-                        else
-                                b -= '0';
-                        *dst++ = 16*a+b;
-                        src+=3;
-                } else {
-                        *dst++ = *src++;
-                }
+    char a, b;
+    while (*src) {
+        if ((*src == '%') &&
+            ((a = src[1]) && (b = src[2])) &&
+            (isxdigit(a) && isxdigit(b))) {
+                if (a >= 'a')
+                        a -= 'a'-'A';
+                if (a >= 'A')
+                        a -= ('A' - 10);
+                else
+                        a -= '0';
+                if (b >= 'a')
+                        b -= 'a'-'A';
+                if (b >= 'A')
+                        b -= ('A' - 10);
+                else
+                        b -= '0';
+                *dst++ = 16*a+b;
+                src+=3;
+        } else {
+                *dst++ = *src++;
         }
-        *dst++ = '\0';
+    }
+    *dst++ = '\0';
 }
 
 
@@ -54,7 +57,7 @@ RequestInfo getRequestInfo(const string& line)
     string method = string(line, 0, mp);
 
     size_t pp = line.find(" ", mp+1);
-    string path = string(line, mp+1, pp-mp);
+    string path = string(line, mp+1, pp-mp-1);
 
     if (line.find(" ", pp+1) != string::npos) { // extra spaces in request
         return RequestInfo::BAD_REQUEST;
@@ -98,29 +101,19 @@ inline void writeHeader(bufferevent *bev, Status s, const ContentType& t, int le
                         len, SERVER, CONNECTION, ctime(&timer));
 }
 
-void sampleResponse(bufferevent *bev)
-{
-    evbuffer *output = bufferevent_get_output(bev);
-
-    char  body[]    =   "<HTML><TITLE>Test</TITLE>\r\n"
-                        "<BODY><P>Sample answer\r\n"
-                        "</BODY></HTML>\r\n";
-
-    writeHeader(bev, OK, HTML, strlen(body));
-    evbuffer_add(output, body, strlen(body));
-}
-
 void wrieResponse(bufferevent *bev, const char* path)
 {
-
     evbuffer *output = bufferevent_get_output(bev);
 
-    char  body[]    =   "<HTML><TITLE>Test</TITLE>\r\n"
-                        "<BODY><P>Sample answer\r\n"
-                        "</BODY></HTML>\r\n";
+    string full_path = string(DOCUMENT_ROOT);
+    full_path.append(path);
 
-    writeHeader(bev, OK, HTML, strlen(body));
-    evbuffer_add(output, body, strlen(body));
+    int fd = open(full_path.c_str(), O_NONBLOCK|O_RDONLY);
+
+    struct stat st;
+    fstat(fd, &st);
+    writeHeader(bev, OK, HTML, st.st_size);
+    evbuffer_add_file(output, fd, 0, st.st_size);
 }
 
 void writeBadRequest(bufferevent *bev)
@@ -146,11 +139,11 @@ void createResponse(bufferevent *bev)
     if(sz !=0) {
         switch (rinf.method) {
         case HEAD:
-            sampleResponse(bev);
+            wrieResponse(bev, path);
             break;
 
         case GET:
-            sampleResponse(bev);
+            wrieResponse(bev, path);
             break;
 
         case UNSUPPORTED :
@@ -162,7 +155,21 @@ void createResponse(bufferevent *bev)
 
 
 
-bool check_path_security(string path)
+bool check_path_security(const string& path)
 {
-
+    int len = path.length();
+    int i = 0;
+    int level = 0;
+    while(i < len) {
+        if(path[i] == '/'){
+            if(i < len - 2 && path[i+1] == '.' && path[i+2] == '.') {
+                --level;
+            } else {
+                ++level;
+            }
+        } else {
+            ++i;
+        }
+    }
+    return level >= 0;
 }

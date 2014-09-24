@@ -29,10 +29,12 @@ enum ContentType
 };
 
 constexpr const char* ContentString[] = {"text/html", "text/css",  "application/javascript", "image/jpeg",
-                                         "image/jpeg","image/png", "image/gif",              "application/x-shockwave-flash"};
+                                         "image/jpeg","image/png", "image/gif",              "application/x-shockwave-flash"
+                                         "unknown"};
 
 extern const char* SERVER;
 extern const char* CONNECTION;
+constexpr const char* DOCUMENT_ROOT = "/home/andrey/projects/tp/srvroot";
 
 struct RequestInfo{
     RequestMethod method;

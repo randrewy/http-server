@@ -11,8 +11,6 @@
 #include "http.h"
 
 namespace server{
-    constexpr const char* DOCUMENT_ROOT = ""; // lol, C++
-
     enum {
         BACKLOG = -1,
         LISTENER_OPTS = LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE,
