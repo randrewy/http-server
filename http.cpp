@@ -1,4 +1,5 @@
 #include "http.h"
+#include <iostream>
 using namespace std;
 
 const char* SERVER = "TP-HL-SERVER";
@@ -223,6 +224,7 @@ bool check_path_security(const string& path)
         } else {
             ++i;
         }
+        if (level < 0) return false;
     }
-    return level >= 0;
+    return true;
 }
