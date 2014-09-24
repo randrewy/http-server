@@ -31,6 +31,15 @@ enum ContentType
     OTHER,
 };
 
+struct RequestInfo{
+    RequestMethod method;
+    std::string path;
+
+    RequestInfo(const RequestMethod& m, const std::string& p) : method(m), path(p) {}
+    const static RequestInfo BAD_REQUEST;
+};
+
+
 constexpr const char* ContentString[] = {"text/html", "text/css",  "application/javascript", "image/jpeg",
                                          "image/jpeg","image/png", "image/gif",              "application/x-shockwave-flash"
                                          "unknown"};
@@ -40,13 +49,6 @@ extern const char* SERVER;
 extern const char* CONNECTION;
 constexpr const char* DOCUMENT_ROOT = "/home/andrey/projects/tp/srvroot";
 
-struct RequestInfo{
-    RequestMethod method;
-    std::string path;
-
-    RequestInfo(const RequestMethod& m, const std::string& p) : method(m), path(p) {}
-    const static RequestInfo BAD_REQUEST;
-};
 
 void createResponse(bufferevent*);
 
