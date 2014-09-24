@@ -39,16 +39,9 @@ struct RequestInfo{
     const static RequestInfo BAD_REQUEST;
 };
 
-
-constexpr const char* ContentString[] = {"text/html", "text/css",  "application/javascript", "image/jpeg",
-                                         "image/jpeg","image/png", "image/gif",              "application/x-shockwave-flash"
-                                         "unknown"};
-
-
-extern const char* SERVER;
-extern const char* CONNECTION;
+constexpr const char* SERVER = "TP-HL-SERVER";
+constexpr const char* CONNECTION = "close";
 constexpr const char* DOCUMENT_ROOT = "/home/andrey/projects/tp/srvroot";
-
 
 void createResponse(bufferevent*);
 

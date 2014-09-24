@@ -2,13 +2,20 @@
 #include <iostream>
 using namespace std;
 
-const char* SERVER = "TP-HL-SERVER";
-const char* CONNECTION= "close";
+const char* FORBIDDEN_MSG = "405 Forbidden";
+const int   FORBIDDEN_LEN = 13;
+const char* NOT_FOUND_MSG = "404 Not found";
+const int   NOT_FOUND_LEN = 13;
+
 const RequestInfo RequestInfo::BAD_REQUEST = RequestInfo(UNSUPPORTED, "");
 std::map<std::string, const char*> CONTENTS =   {{"html","text/html"},   {"css", "text/css"},   {"js", "application/javascript"},
                                                  {"jpeg", "image/jpeg"}, {"jpg", "image/jpeg"}, {"png", "image/png"},
                                                  {"gif", "image/gif"},   {"swf",  "application/x-shockwave-flash"}
                                                 };
+
+constexpr const char* ContentString[] = {"text/html", "text/css",  "application/javascript", "image/jpeg",
+                                         "image/jpeg","image/png", "image/gif",              "application/x-shockwave-flash"
+                                         "unknown"};
 
 bool check_path_security(const string& path);
 
@@ -110,7 +117,7 @@ inline void writeHeader(bufferevent *bev, Status s, const ContentType& t, int le
                         "Content-Length: %d\r\n"
                         "Server: %s\r\n"
                         "Connection: %s\r\n"
-                        "Date: %s\r\n";
+                        "Date: %s\r\n\r\n";
     const time_t timer = time(NULL);
     evbuffer_add_printf(output, headers, statusMessgae(s), contentTypeString(t),
                         len, SERVER, CONNECTION, ctime(&timer));
@@ -141,7 +148,8 @@ void writeResponse(bufferevent *bev, const char* path, RequestMethod method)
     full_path.append(string(path));
 
     if(!check_path_security(path)) {
-        writeHeader(bev, FORBIDDEN, HTML, 0);
+        writeHeader(bev, FORBIDDEN, HTML, FORBIDDEN_LEN);
+        evbuffer_add(output, FORBIDDEN_MSG, FORBIDDEN_LEN);
         return;
     }
 
@@ -154,9 +162,11 @@ void writeResponse(bufferevent *bev, const char* path, RequestMethod method)
     int fd = open(full_path.c_str(), O_NONBLOCK|O_RDONLY);
     if (fd == -1) {
         if (index) {
-            writeHeader(bev, FORBIDDEN, HTML, 0);
+            writeHeader(bev, FORBIDDEN, HTML, FORBIDDEN_LEN);
+            evbuffer_add(output, FORBIDDEN_MSG, FORBIDDEN_LEN);
         } else {
-            writeHeader(bev, NOT_FOUND, HTML, 0);
+            writeHeader(bev, NOT_FOUND, HTML, NOT_FOUND_LEN);
+            evbuffer_add(output, NOT_FOUND_MSG, NOT_FOUND_LEN);
         }
         return;
     }

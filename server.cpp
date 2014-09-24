@@ -56,7 +56,9 @@ void accept_error_cb(evconnlistener *listener, void*)
 
 int server::start(unsigned int port)
 {
-    cout << "Hello from " << SERVER <<"!\n";
+    cout << "Hello from " << SERVER <<"! Current time: ";
+    const time_t timer = time(NULL);
+    std::cout << ctime(&timer);
 
     event_base *base;
     evconnlistener *listener;
