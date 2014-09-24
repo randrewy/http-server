@@ -4,12 +4,15 @@
 #include <fcntl.h>
 using namespace std;
 
-
 const char* SERVER = "TP-HL-SERVER";
 const char* CONNECTION= "close";
 const RequestInfo RequestInfo::BAD_REQUEST = RequestInfo(UNSUPPORTED, "");
+std::map<std::string, const char*> CONTENTS = {{"html","text/html"},   {"css", "text/css"},   {"js", "application/javascript"},
+                                         {"jpeg", "image/jpeg"}, {"jpg", "image/jpeg"}, {"png", "image/png"},
+                                         {"gif", "image/gif"},   {"swf",  "application/x-shockwave-flash"}
+                                        };
 
-bool check_path(const char* path);
+bool check_path_security(const string& path);
 
 void urlDecode(char *dst, const char *src)
 {
@@ -33,7 +36,7 @@ void urlDecode(char *dst, const char *src)
                 *dst++ = 16*a+b;
                 src+=3;
         } else {
-                *dst++ = *src++;
+            *dst++ = *src++;
         }
     }
     *dst++ = '\0';
@@ -71,6 +74,8 @@ const char* statusMessgae(const Status& s)
     switch(s) {
     case OK:
         return "200 OK";
+    case FORBIDDEN:
+        return "403 Forbidden";
     case NOT_FOUND:
         return "404 Not Found";
     case BAD_REQUEST:
@@ -84,6 +89,19 @@ inline const char* contentTypeString(const ContentType& t)
     return ContentString[t];
 }
 
+ContentType getContentType(const string& path)
+{
+    int point_pos = path.find_last_of('.');
+    string ext = path.substr(point_pos+1);
+    return ContentType(0);
+}
+
+const char* getMappedContentType(const string& path)
+{
+    int point_pos = path.find_last_of('.');
+    string ext = path.substr(point_pos+1);
+    return CONTENTS[ext]; //to lower case!
+}
 
 inline void writeHeader(bufferevent *bev, Status s, const ContentType& t, int len)
 {
@@ -94,26 +112,67 @@ inline void writeHeader(bufferevent *bev, Status s, const ContentType& t, int le
                         "Content-Length: %d\r\n"
                         "Server: %s\r\n"
                         "Connection: %s\r\n"
-                        "Date: %s\r\n"
-                        "\r\n";
+                        "Date: %s\r\n";
     const time_t timer = time(NULL);
     evbuffer_add_printf(output, headers, statusMessgae(s), contentTypeString(t),
                         len, SERVER, CONNECTION, ctime(&timer));
 }
 
-void wrieResponse(bufferevent *bev, const char* path)
+inline void writeHeader(bufferevent *bev, Status s, const char* t, int len)
+{
+    evbuffer *output = bufferevent_get_output(bev);
+
+    char  headers[]=    "HTTP/1.1 %s\r\n"
+                        "Content-Type: %s\r\n"
+                        "Content-Length: %d\r\n"
+                        "Server: %s\r\n"
+                        "Connection: %s\r\n"
+                        "Date: %s\r\n";
+    const time_t timer = time(NULL);
+    evbuffer_add_printf(output, headers, statusMessgae(s), t,
+                        len, SERVER, CONNECTION, ctime(&timer));
+}
+
+
+
+void writeResponse(bufferevent *bev, const char* path, RequestMethod method)
 {
     evbuffer *output = bufferevent_get_output(bev);
 
     string full_path = string(DOCUMENT_ROOT);
-    full_path.append(path);
+    full_path.append(string(path));
+
+    if(!check_path_security(path)) {
+        writeHeader(bev, FORBIDDEN, HTML, 0);
+        return;
+    }
+
+    bool index = false;
+    cerr << full_path[full_path.length()-1] << "*\n";
+    if (full_path[full_path.length()-1] == '/') { // directory
+        full_path.append("index.html");
+        index = true;
+    }
 
     int fd = open(full_path.c_str(), O_NONBLOCK|O_RDONLY);
+    if (fd == -1) {
+        if (index) {
+            writeHeader(bev, FORBIDDEN, HTML, 0);
+        } else {
+            writeHeader(bev, NOT_FOUND, HTML, 0);
+        }
+        return;
+    }
 
     struct stat st;
     fstat(fd, &st);
-    writeHeader(bev, OK, HTML, st.st_size);
-    evbuffer_add_file(output, fd, 0, st.st_size);
+    writeHeader(bev, OK, getMappedContentType(full_path), st.st_size);
+    if(method == GET) {
+        evbuffer_add_file(output, fd, 0, st.st_size);
+    } else {
+        const char* CRLF = "\r\n";
+        evbuffer_add(output, CRLF, 2);
+    }
 }
 
 void writeBadRequest(bufferevent *bev)
@@ -133,17 +192,13 @@ void createResponse(bufferevent *bev)
 
     size_t param_delim = rinf.path.find('?');
     string raw_path = rinf.path.substr(0, param_delim);
-    char* path = new char[raw_path.length()]; // at most the same size
+    char* path = new char[raw_path.length()+1]; // at most the same size + term\0
     urlDecode(path, raw_path.c_str());
 
     if(sz !=0) {
         switch (rinf.method) {
-        case HEAD:
-            wrieResponse(bev, path);
-            break;
-
-        case GET:
-            wrieResponse(bev, path);
+        case HEAD:  case GET:
+            writeResponse(bev, path, rinf.method);
             break;
 
         case UNSUPPORTED :
@@ -164,8 +219,10 @@ bool check_path_security(const string& path)
         if(path[i] == '/'){
             if(i < len - 2 && path[i+1] == '.' && path[i+2] == '.') {
                 --level;
+                i += 3;
             } else {
                 ++level;
+                ++i;
             }
         } else {
             ++i;

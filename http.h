@@ -5,9 +5,11 @@
 #include <event2/buffer.h>
 #include <cstring>
 #include <string>
+#include <map>
 
 enum Status {
     OK = 200,
+    FORBIDDEN = 403,
     NOT_FOUND = 404,
     BAD_REQUEST = 405,
 };
@@ -20,7 +22,6 @@ enum RequestMethod{
 };
 
 
-
 enum ContentType
 {
     HTML = 0, CSS, JS,  JPG,
@@ -31,6 +32,7 @@ enum ContentType
 constexpr const char* ContentString[] = {"text/html", "text/css",  "application/javascript", "image/jpeg",
                                          "image/jpeg","image/png", "image/gif",              "application/x-shockwave-flash"
                                          "unknown"};
+
 
 extern const char* SERVER;
 extern const char* CONNECTION;
