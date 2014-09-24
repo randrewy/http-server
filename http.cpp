@@ -76,8 +76,13 @@ const char* statusMessgae(const Status& s)
     return "500 internal error";
 }
 
+inline const char* contentTypeString(const ContentType& t)
+{
+    return ContentString[t];
+}
 
-inline void writeHeader(bufferevent *bev, Status s, const char* type, int len)
+
+inline void writeHeader(bufferevent *bev, Status s, const ContentType& t, int len)
 {
     evbuffer *output = bufferevent_get_output(bev);
 
@@ -89,7 +94,7 @@ inline void writeHeader(bufferevent *bev, Status s, const char* type, int len)
                         "Date: %s\r\n"
                         "\r\n";
     const time_t timer = time(NULL);
-    evbuffer_add_printf(output, headers, statusMessgae(s), type,
+    evbuffer_add_printf(output, headers, statusMessgae(s), contentTypeString(t),
                         len, SERVER, CONNECTION, ctime(&timer));
 }
 
@@ -101,17 +106,12 @@ void sampleResponse(bufferevent *bev)
                         "<BODY><P>Sample answer\r\n"
                         "</BODY></HTML>\r\n";
 
-    writeHeader(bev, OK, "text/html", strlen(body));
+    writeHeader(bev, OK, HTML, strlen(body));
     evbuffer_add(output, body, strlen(body));
 }
 
 void wrieResponse(bufferevent *bev, const char* path)
 {
-//    if (check_path(path)) {
-
-//    }
-
-    //int fd = open(sWholePath.c_str(), O_RDONLY);
 
     evbuffer *output = bufferevent_get_output(bev);
 
@@ -119,7 +119,7 @@ void wrieResponse(bufferevent *bev, const char* path)
                         "<BODY><P>Sample answer\r\n"
                         "</BODY></HTML>\r\n";
 
-    writeHeader(bev, OK, "text/html", strlen(body));
+    writeHeader(bev, OK, HTML, strlen(body));
     evbuffer_add(output, body, strlen(body));
 }
 
@@ -128,7 +128,7 @@ void writeBadRequest(bufferevent *bev)
     evbuffer *output = bufferevent_get_output(bev);
 
     char  body[]    =   "405 Not Allowed\r\n";
-    writeHeader(bev, BAD_REQUEST, "text/html", 17);
+    writeHeader(bev, BAD_REQUEST, HTML, 17);
     evbuffer_add(output, body, strlen(body));
 }
 

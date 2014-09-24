@@ -12,11 +12,24 @@ enum Status {
     BAD_REQUEST = 405,
 };
 
+
 enum RequestMethod{
     GET,
     HEAD,
     UNSUPPORTED,
 };
+
+
+
+enum ContentType
+{
+    HTML = 0, CSS, JS,  JPG,
+    JPEG,     PNG, GIF, SWF,
+    OTHER,
+};
+
+constexpr const char* ContentString[] = {"text/html", "text/css",  "application/javascript", "image/jpeg",
+                                         "image/jpeg","image/png", "image/gif",              "application/x-shockwave-flash"};
 
 extern const char* SERVER;
 extern const char* CONNECTION;
