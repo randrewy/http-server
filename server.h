@@ -10,15 +10,15 @@
 
 #include "http.h"
 
-
 namespace server{
-enum {
-    PORT = 8080,
-    BACKLOG = -1,
-    LISTENER_OPTS = LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE,
-};
+    constexpr const char* DOCUMENT_ROOT = ""; // lol, C++
 
-    int start();
+    enum {
+        BACKLOG = -1,
+        LISTENER_OPTS = LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE,
+    };
+
+    int start(unsigned int port);
 
 }
 

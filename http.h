@@ -26,7 +26,7 @@ struct RequestInfo{
     std::string path;
 
     RequestInfo(const RequestMethod& m, const std::string& p) : method(m), path(p) {}
-    static RequestInfo BAD_REQUEST;
+    const static RequestInfo BAD_REQUEST;
 };
 
 void createResponse(bufferevent*);

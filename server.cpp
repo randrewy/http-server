@@ -54,7 +54,7 @@ void accept_error_cb(evconnlistener *listener, void*)
     event_base_loopexit(base, NULL);
 }
 
-int server::start()
+int server::start(unsigned int port)
 {
     cout << "Hello from " << SERVER <<"!\n";
 
@@ -69,7 +69,7 @@ int server::start()
     }
 
     memset(&sin, 0, sizeof(sin));
-    sin.sin_port = htons(PORT);
+    sin.sin_port = htons(port);
     sin.sin_addr.s_addr = htonl(INADDR_ANY);
     sin.sin_family = AF_INET;
 
@@ -82,7 +82,7 @@ int server::start()
     }
 
     evconnlistener_set_error_cb(listener, accept_error_cb);
-    cout << "Listen started on port " << PORT <<".\n";
+    cout << "Listen started on port " << port <<".\n";
     event_base_dispatch(base);
 
 
