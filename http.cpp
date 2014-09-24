@@ -1,16 +1,13 @@
 #include "http.h"
-#include <iostream>
-#include <sys/stat.h>
-#include <fcntl.h>
 using namespace std;
 
 const char* SERVER = "TP-HL-SERVER";
 const char* CONNECTION= "close";
 const RequestInfo RequestInfo::BAD_REQUEST = RequestInfo(UNSUPPORTED, "");
-std::map<std::string, const char*> CONTENTS = {{"html","text/html"},   {"css", "text/css"},   {"js", "application/javascript"},
-                                         {"jpeg", "image/jpeg"}, {"jpg", "image/jpeg"}, {"png", "image/png"},
-                                         {"gif", "image/gif"},   {"swf",  "application/x-shockwave-flash"}
-                                        };
+std::map<std::string, const char*> CONTENTS =   {{"html","text/html"},   {"css", "text/css"},   {"js", "application/javascript"},
+                                                 {"jpeg", "image/jpeg"}, {"jpg", "image/jpeg"}, {"png", "image/png"},
+                                                 {"gif", "image/gif"},   {"swf",  "application/x-shockwave-flash"}
+                                                };
 
 bool check_path_security(const string& path);
 
@@ -148,7 +145,6 @@ void writeResponse(bufferevent *bev, const char* path, RequestMethod method)
     }
 
     bool index = false;
-    cerr << full_path[full_path.length()-1] << "*\n";
     if (full_path[full_path.length()-1] == '/') { // directory
         full_path.append("index.html");
         index = true;
