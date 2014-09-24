@@ -5,5 +5,11 @@ CONFIG -= qt
 
 LIBS += -levent
 
-SOURCES += main.cpp
+SOURCES += main.cpp \
+    server.cpp \
+    http.cpp
+
+HEADERS += \
+    server.h \
+    http.h
 
