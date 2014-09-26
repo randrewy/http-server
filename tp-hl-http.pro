@@ -6,7 +6,8 @@ CONFIG -= qt
 QMAKE_CXXFLAGS += -std=c++11 \
                   -O3
 
-LIBS += -levent
+LIBS += -levent \
+        -lpthread
 
 SOURCES += main.cpp \
     server.cpp \

@@ -1,5 +1,14 @@
 #include "server.h"
+#include <pthread.h>
+#include <mutex>
+#include <unistd.h>
+#include <list>
 using namespace std;
+
+static void * thread_func(void *vptr_args);
+
+list<evutil_socket_t>sock_list;
+std::mutex sock_list_mutex;
 
 void conn_eventcb(bufferevent *bev, short events, void*)
 {
@@ -45,6 +54,13 @@ void accept_conn_cb( evconnlistener*, evutil_socket_t fd, sockaddr*, int, void *
     }
 }
 
+void accept_conn_cb_main (evconnlistener*, evutil_socket_t fd, sockaddr*, int, void*)
+{
+    sock_list_mutex.lock();
+    sock_list.push_back(fd);
+    sock_list_mutex.unlock();
+}
+
 void accept_error_cb(evconnlistener *listener, void*)
 {
     event_base *base = evconnlistener_get_base(listener);
@@ -59,6 +75,8 @@ int server::start(unsigned int port)
     cout << "Hello from " << SERVER <<"! Current time: ";
     const time_t timer = time(NULL);
     std::cout << ctime(&timer);
+
+    std::cout << (0) << '\n';
 
     event_base *base;
     evconnlistener *listener;
@@ -75,7 +93,7 @@ int server::start(unsigned int port)
     sin.sin_addr.s_addr = htonl(INADDR_ANY);
     sin.sin_family = AF_INET;
 
-    listener = evconnlistener_new_bind(base, accept_conn_cb, base, LISTENER_OPTS,
+    listener = evconnlistener_new_bind(base, accept_conn_cb_main, base, LISTENER_OPTS,
                         BACKLOG, reinterpret_cast<sockaddr*>(&sin), sizeof(sin));
 
     if (!listener) {
@@ -85,8 +103,17 @@ int server::start(unsigned int port)
 
     evconnlistener_set_error_cb(listener, accept_error_cb);
     cout << "Listen started on port " << port <<".\n";
-    event_base_dispatch(base);
 
+    //------------------------------------
+        const int MAX_THREADS = 6;
+        pthread_t thread[MAX_THREADS];
+        for(int i = 0; i < MAX_THREADS; ++i) {
+            pthread_create(&thread[i], NULL, thread_func, NULL);
+        }
+    //------------------------------------
+
+    cout << "Dispatching\n";
+    event_base_dispatch(base);
 
     evconnlistener_free(listener);
     event_base_free(base);
@@ -94,3 +121,32 @@ int server::start(unsigned int port)
     return 0;
 }
 
+
+static void *thread_func(void*)
+{
+    int thread_id = pthread_self()%13;
+    cout << "thread started : " << thread_id << '\n';
+
+    event_base *base = event_base_new();
+    if (!base) {
+        cerr << "Could not initialize event_base in thread!\n";
+        return NULL;
+    }
+    while(true) {
+        event_base_loop(base, EVLOOP_ONCE);
+        //fetch_events();
+        sock_list_mutex.lock();
+        if (!sock_list.empty()) {
+            //cout << "answer from : " << thread_id << '\n';
+            evutil_socket_t fd = sock_list.back();
+            sock_list.pop_back();
+            accept_conn_cb( NULL, fd, NULL, 0 , (void*)base);
+        }
+        sock_list_mutex.unlock();
+    }
+    return NULL;
+}
+
+struct queue{
+
+};
