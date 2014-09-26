@@ -121,6 +121,17 @@ int server::start(unsigned int port)
     return 0;
 }
 
+inline evutil_socket_t next_fd()
+{
+    int res = 0;    // stdin like an arror
+    sock_list_mutex.lock();
+    if (!sock_list.empty()) {
+        res = sock_list.back();
+        sock_list.pop_back();
+    }
+    sock_list_mutex.unlock();
+    return res;
+}
 
 static void *thread_func(void*)
 {
@@ -139,13 +150,9 @@ static void *thread_func(void*)
     while(true) {
         event_base_loop(base, EVLOOP_ONCE);
 
-        sock_list_mutex.lock();
-        if (!sock_list.empty()) {
-            evutil_socket_t fd = sock_list.back();
-            sock_list.pop_back();
+        if (evutil_socket_t fd = next_fd()) {
             accept_conn_cb(NULL, fd, NULL, 0 , (void*)base);
         }
-        sock_list_mutex.unlock();
         nanosleep(&nts, &some);
     }
     cerr << "Thread: Unexpected loop exit!\n";
