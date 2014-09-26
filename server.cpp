@@ -104,16 +104,16 @@ int server::start(unsigned int port)
     evconnlistener_set_error_cb(listener, accept_error_cb);
     cout << "Listen started on port " << port <<".\n";
 
-    //------------------------------------
-        const int MAX_THREADS = 6;
-        pthread_t thread[MAX_THREADS];
-        for(int i = 0; i < MAX_THREADS; ++i) {
+    if (NUM_THREADS > 0) {
+        pthread_t thread[NUM_THREADS];
+        for(int i = 0; i < NUM_THREADS; ++i) {
             pthread_create(&thread[i], NULL, thread_func, NULL);
         }
-    //------------------------------------
-
-    cout << "Dispatching\n";
-    event_base_dispatch(base);
+        cout << "Dispatching\n";
+        event_base_dispatch(base);
+    } else {
+        cerr << "No worker threads!\n";
+    }
 
     evconnlistener_free(listener);
     event_base_free(base);
@@ -124,9 +124,6 @@ int server::start(unsigned int port)
 
 static void *thread_func(void*)
 {
-    int thread_id = pthread_self()%13;
-    cout << "thread started : " << thread_id << '\n';
-
     event_base *base = event_base_new();
     if (!base) {
         cerr << "Could not initialize event_base in thread!\n";
@@ -134,13 +131,12 @@ static void *thread_func(void*)
     }
     while(true) {
         event_base_loop(base, EVLOOP_ONCE);
-        //fetch_events();
+
         sock_list_mutex.lock();
         if (!sock_list.empty()) {
-            //cout << "answer from : " << thread_id << '\n';
             evutil_socket_t fd = sock_list.back();
             sock_list.pop_back();
-            accept_conn_cb( NULL, fd, NULL, 0 , (void*)base);
+            accept_conn_cb(NULL, fd, NULL, 0 , (void*)base);
         }
         sock_list_mutex.unlock();
     }

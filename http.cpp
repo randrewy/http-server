@@ -2,7 +2,7 @@
 #include <iostream>
 using namespace std;
 
-const char* FORBIDDEN_MSG = "405 Forbidden";
+const char* FORBIDDEN_MSG = "403 Forbidden";
 const int   FORBIDDEN_LEN = 13;
 const char* NOT_FOUND_MSG = "404 Not found";
 const int   NOT_FOUND_LEN = 13;
