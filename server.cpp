@@ -124,7 +124,14 @@ int server::start(unsigned int port)
 
 static void *thread_func(void*)
 {
-    event_base *base = event_base_new();
+    event_config* cfg = event_config_new();
+    event_config_set_flag(cfg, EVENT_BASE_FLAG_NOLOCK );
+    event_config_set_flag(cfg, EVENT_BASE_FLAG_EPOLL_USE_CHANGELIST );
+    event_base *base = event_base_new_with_config(cfg);
+
+    timespec nts = {0, 24};
+    timespec some = {0, 24};
+
     if (!base) {
         cerr << "Could not initialize event_base in thread!\n";
         return NULL;
@@ -139,10 +146,9 @@ static void *thread_func(void*)
             accept_conn_cb(NULL, fd, NULL, 0 , (void*)base);
         }
         sock_list_mutex.unlock();
+        nanosleep(&nts, &some);
     }
+    cerr << "Thread: Unexpected loop exit!\n";
     return NULL;
 }
 
-struct queue{
-
-};
