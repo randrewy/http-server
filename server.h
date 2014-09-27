@@ -14,7 +14,7 @@ namespace server{
     enum {
         BACKLOG = -1,
         LISTENER_OPTS = LEV_OPT_REUSEABLE|LEV_OPT_CLOSE_ON_FREE|LEV_OPT_THREADSAFE,
-        NUM_THREADS = 6,
+        NUM_THREADS = 1,
     };
 
     int start(unsigned int port);
