@@ -18,7 +18,27 @@ constexpr const char* ContentString[] = {"text/html", "text/css",  "application/
                                          "image/jpeg","image/png", "image/gif",              "application/x-shockwave-flash"
                                          "unknown"};
 
-bool check_path_security(const string& path);
+bool check_path_security(const string& path)
+{
+    int len = path.length();
+    int i = 0;
+    int level = 0;
+    while(i < len) {
+        if(path[i] == '/'){
+            if(i < len - 2 && path[i+1] == '.' && path[i+2] == '.') {
+                --level;
+                i += 3;
+            } else {
+                ++level;
+                ++i;
+            }
+        } else {
+            ++i;
+        }
+        if (level < 0) return false;
+    }
+    return true;
+}
 
 inline void getTime(char* time_buf)
 {
@@ -56,6 +76,15 @@ void urlDecode(char *dst, const char *src)
         }
     }
     *dst++ = '\0';
+}
+
+char* get_new_path(const string& p)
+{
+    size_t param_delim = p.find('?');
+    string raw_path = p.substr(0, param_delim);
+    char* path = new char[raw_path.length()+1]; // at most the same size + term\0
+    urlDecode(path, raw_path.c_str());
+    return path;
 }
 
 
@@ -103,13 +132,6 @@ const char* statusMessgae(const Status& s)
 inline const char* contentTypeString(const ContentType& t)
 {
     return ContentString[t];
-}
-
-ContentType getContentType(const string& path)
-{
-    int point_pos = path.find_last_of('.');
-    string ext = path.substr(point_pos+1);
-    return ContentType(0);
 }
 
 const char* getMappedContentType(const string& path)
@@ -209,11 +231,7 @@ void createResponse(bufferevent *bev)
     size_t sz = 0;
     RequestInfo rinf = getRequestInfo(string(evbuffer_readln(in, &sz, EVBUFFER_EOL_CRLF)));
 
-    size_t param_delim = rinf.path.find('?');
-    string raw_path = rinf.path.substr(0, param_delim);
-    char* path = new char[raw_path.length()+1]; // at most the same size + term\0
-    urlDecode(path, raw_path.c_str());
-
+    char* path = get_new_path(rinf.path);
     if(sz !=0) {
         switch (rinf.method) {
         case HEAD:  case GET:
@@ -222,31 +240,8 @@ void createResponse(bufferevent *bev)
 
         case UNSUPPORTED :
             writeBadRequest(bev);
+            break;
         }
     }
     delete[] path;
-}
-
-
-
-bool check_path_security(const string& path)
-{
-    int len = path.length();
-    int i = 0;
-    int level = 0;
-    while(i < len) {
-        if(path[i] == '/'){
-            if(i < len - 2 && path[i+1] == '.' && path[i+2] == '.') {
-                --level;
-                i += 3;
-            } else {
-                ++level;
-                ++i;
-            }
-        } else {
-            ++i;
-        }
-        if (level < 0) return false;
-    }
-    return true;
 }

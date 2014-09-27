@@ -31,6 +31,7 @@ enum ContentType
     OTHER,
 };
 
+
 struct RequestInfo{
     RequestMethod method;
     std::string path;
@@ -38,6 +39,7 @@ struct RequestInfo{
     RequestInfo(const RequestMethod& m, const std::string& p) : method(m), path(p) {}
     const static RequestInfo BAD_REQUEST;
 };
+
 
 constexpr const char* SERVER = "TP-HL-SERVER";
 constexpr const char* CONNECTION = "close";
