@@ -73,7 +73,7 @@ void accept_error_cb(evconnlistener *listener, void*)
     event_base_loopexit(base, NULL);
 }
 
-int server::start(unsigned int port)
+int server::start(unsigned int port, int threads)
 {
     cout << "Hello from " << SERVER <<"! Current time: ";
     const time_t timer = time(NULL);
@@ -107,9 +107,9 @@ int server::start(unsigned int port)
     evconnlistener_set_error_cb(listener, accept_error_cb);
     cout << "Listen started on port " << port <<".\n";
 
-    if (NUM_THREADS > 0) {
-        pthread_t thread[NUM_THREADS];
-        for(int i = 0; i < NUM_THREADS; ++i) {
+    if (threads > 0) {
+        pthread_t thread[threads];
+        for(int i = 0; i < threads; ++i) {
             pthread_create(&thread[i], NULL, thread_func, NULL);
         }
         cout << "Dispatching\n";
@@ -127,18 +127,17 @@ int server::start(unsigned int port)
 inline evutil_socket_t next_fd()
 {
     int res = 0;    // stdin like an arror
-    if (!sock_list.empty()) {
-        res = sock_list.pop();
-    }
+    sock_list.pop(res);
     return res;
 }
 
 static void *thread_func(void*)
 {
-    event_config* cfg = event_config_new();
-    event_config_set_flag(cfg, EVENT_BASE_FLAG_NOLOCK );
-    event_config_set_flag(cfg, EVENT_BASE_FLAG_EPOLL_USE_CHANGELIST );
-    event_base *base = event_base_new_with_config(cfg);
+    //event_config* cfg = event_config_new();
+    //event_config_set_flag(cfg, EVENT_BASE_FLAG_NOLOCK );
+    //event_config_set_flag(cfg, EVENT_BASE_FLAG_EPOLL_USE_CHANGELIST );
+    //event_base *base = event_base_new_with_config(cfg);
+    event_base *base = event_base_new();
 
     timespec nts = {0, 32};
     timespec some = {0, 32};

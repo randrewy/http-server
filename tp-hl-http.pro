@@ -8,7 +8,7 @@ QMAKE_CXXFLAGS += -std=c++11 \
 
 LIBS += -levent \
         -lpthread \
-        -levent_pthreads -lpthread -lboost_system
+        -levent_pthreads -lpthread
 
 SOURCES += main.cpp \
     server.cpp \
