@@ -1,6 +1,5 @@
 #include "server.h"
 #include <pthread.h>
-#include <mutex>
 #include <unistd.h>
 #include <list>
 #include <boost/lockfree/queue.hpp>
@@ -8,9 +7,7 @@ using namespace std;
 
 static void * thread_func(void *vptr_args);
 
-//list<evutil_socket_t>sock_list;
 boost::lockfree::queue<evutil_socket_t> sock_list(1<<12);
-std::mutex sock_list_mutex;
 
 void conn_eventcb(bufferevent *bev, short events, void*)
 {
@@ -58,9 +55,6 @@ void accept_conn_cb( evconnlistener*, evutil_socket_t fd, sockaddr*, int, void *
 
 void accept_conn_cb_main (evconnlistener*, evutil_socket_t fd, sockaddr*, int, void*)
 {
-    //sock_list_mutex.lock();
-    //sock_list.push_back(fd);
-    //sock_list_mutex.unlock();
     sock_list.push(fd);
 }
 
@@ -78,8 +72,6 @@ int server::start(unsigned int port, int threads)
     cout << "Hello from " << SERVER <<"! Current time: ";
     const time_t timer = time(NULL);
     std::cout << ctime(&timer);
-
-    std::cout << (0) << '\n';
 
     event_base *base;
     evconnlistener *listener;

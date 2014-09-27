@@ -21,6 +21,16 @@ constexpr const char* ContentString[] = {"text/html", "text/css",  "application/
 
 bool check_path_security(const string& path);
 
+inline void getTime(char* time_buf)
+{
+    time_t rawtime;
+    struct tm * timeinfo;
+    time (&rawtime);
+    timeinfo = gmtime (&rawtime);
+
+    strftime (time_buf, 64, "%a, %d %b %G %T %Z", timeinfo);
+}
+
 void urlDecode(char *dst, const char *src)
 {
     char a, b;
@@ -118,11 +128,13 @@ inline void writeHeader(bufferevent *bev, Status s, const ContentType& t, int le
                         "Content-Type: %s\r\n"
                         "Content-Length: %d\r\n"
                         "Server: %s\r\n"
-                        "Connection: %s\r\n"
-                        "Date: %s\r\n";
-    const time_t timer = time(NULL);
+                        "Date: %s\r\n"
+                        "Connection: %s\r\n\r\n";
+
+    char time_buff[64];
+    getTime(time_buff);
     evbuffer_add_printf(output, headers, statusMessgae(s), contentTypeString(t),
-                        len, SERVER, CONNECTION, ctime(&timer));
+                        len, SERVER, time_buff, CONNECTION);
 }
 
 inline void writeHeader(bufferevent *bev, Status s, const char* t, int len)
@@ -133,11 +145,13 @@ inline void writeHeader(bufferevent *bev, Status s, const char* t, int len)
                         "Content-Type: %s\r\n"
                         "Content-Length: %d\r\n"
                         "Server: %s\r\n"
-                        "Connection: %s\r\n"
-                        "Date: %s\r\n";
-    const time_t timer = time(NULL);
+                        "Date: %s\r\n"
+                        "Connection: %s\r\n\r\n";
+
+    char time_buff[64];
+    getTime(time_buff);
     evbuffer_add_printf(output, headers, statusMessgae(s), t,
-                        len, SERVER, CONNECTION, ctime(&timer));
+                        len, SERVER, time_buff, CONNECTION);
 }
 
 
