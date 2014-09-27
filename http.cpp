@@ -6,6 +6,8 @@ const char* FORBIDDEN_MSG = "403 Forbidden";
 const int   FORBIDDEN_LEN = 13;
 const char* NOT_FOUND_MSG = "404 Not found";
 const int   NOT_FOUND_LEN = 13;
+const char* NOT_ALLOW_MSG = "405 Not allowed";
+const int   NOT_ALLOW_LEN = 15;
 
 const RequestInfo RequestInfo::BAD_REQUEST = RequestInfo(UNSUPPORTED, "");
 
@@ -13,10 +15,6 @@ std::map<std::string, const char*> CONTENTS =   {{"html","text/html"},   {"css",
                                                  {"jpeg", "image/jpeg"}, {"jpg", "image/jpeg"}, {"png", "image/png"},
                                                  {"gif", "image/gif"},   {"swf",  "application/x-shockwave-flash"}
                                                 };
-
-constexpr const char* ContentString[] = {"text/html", "text/css",  "application/javascript", "image/jpeg",
-                                         "image/jpeg","image/png", "image/gif",              "application/x-shockwave-flash"
-                                         "unknown"};
 
 bool check_path_security(const string& path)
 {
@@ -129,33 +127,11 @@ const char* statusMessgae(const Status& s)
     return "500 internal error";
 }
 
-inline const char* contentTypeString(const ContentType& t)
-{
-    return ContentString[t];
-}
-
 const char* getMappedContentType(const string& path)
 {
     int point_pos = path.find_last_of('.');
     string ext = path.substr(point_pos+1);
-    return CONTENTS[ext]; //to lower case!
-}
-
-inline void writeHeader(bufferevent *bev, Status s, const ContentType& t, int len)
-{
-    evbuffer *output = bufferevent_get_output(bev);
-
-    char  headers[]=    "HTTP/1.1 %s\r\n"
-                        "Content-Type: %s\r\n"
-                        "Content-Length: %d\r\n"
-                        "Server: %s\r\n"
-                        "Date: %s\r\n"
-                        "Connection: %s\r\n\r\n";
-
-    char time_buff[64];
-    getTime(time_buff);
-    evbuffer_add_printf(output, headers, statusMessgae(s), contentTypeString(t),
-                        len, SERVER, time_buff, CONNECTION);
+    return CONTENTS[ext]; // TODO: to lower case?
 }
 
 inline void writeHeader(bufferevent *bev, Status s, const char* t, int len)
@@ -175,7 +151,24 @@ inline void writeHeader(bufferevent *bev, Status s, const char* t, int len)
                         len, SERVER, time_buff, CONNECTION);
 }
 
+void writeForbidden(bufferevent *bev, evbuffer *output)
+{
+    writeHeader(bev, FORBIDDEN, "text/html", FORBIDDEN_LEN);
+    evbuffer_add(output, FORBIDDEN_MSG, FORBIDDEN_LEN);
+}
 
+void writeNotFound(bufferevent *bev, evbuffer *output)
+{
+    writeHeader(bev, NOT_FOUND, "text/html", NOT_FOUND_LEN);
+    evbuffer_add(output, NOT_FOUND_MSG, NOT_FOUND_LEN);
+}
+
+void writeBadRequest(bufferevent *bev)
+{
+    evbuffer *output = bufferevent_get_output(bev);
+    writeHeader(bev, BAD_REQUEST, "text/html", NOT_ALLOW_LEN);
+    evbuffer_add(output, NOT_ALLOW_MSG, NOT_ALLOW_LEN);
+}
 
 void writeResponse(bufferevent *bev, const char* path, RequestMethod method)
 {
@@ -185,8 +178,7 @@ void writeResponse(bufferevent *bev, const char* path, RequestMethod method)
     full_path.append(string(path));
 
     if(!check_path_security(path)) {
-        writeHeader(bev, FORBIDDEN, HTML, FORBIDDEN_LEN);
-        evbuffer_add(output, FORBIDDEN_MSG, FORBIDDEN_LEN);
+        writeForbidden(bev, output);
         return;
     }
 
@@ -199,11 +191,9 @@ void writeResponse(bufferevent *bev, const char* path, RequestMethod method)
     int fd = open(full_path.c_str(), O_NONBLOCK|O_RDONLY);
     if (fd == -1) {
         if (index) {
-            writeHeader(bev, FORBIDDEN, HTML, FORBIDDEN_LEN);
-            evbuffer_add(output, FORBIDDEN_MSG, FORBIDDEN_LEN);
+            writeForbidden(bev, output);
         } else {
-            writeHeader(bev, NOT_FOUND, HTML, NOT_FOUND_LEN);
-            evbuffer_add(output, NOT_FOUND_MSG, NOT_FOUND_LEN);
+            writeNotFound(bev, output);
         }
         return;
     }
@@ -214,15 +204,6 @@ void writeResponse(bufferevent *bev, const char* path, RequestMethod method)
     if(method == GET) {
         evbuffer_add_file(output, fd, 0, st.st_size);
     }
-}
-
-void writeBadRequest(bufferevent *bev)
-{
-    evbuffer *output = bufferevent_get_output(bev);
-
-    char  body[]    =   "405 Not Allowed\r\n";
-    writeHeader(bev, BAD_REQUEST, HTML, 17);
-    evbuffer_add(output, body, strlen(body));
 }
 
 void createResponse(bufferevent *bev)
