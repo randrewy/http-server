@@ -127,13 +127,9 @@ int server::start(unsigned int port)
 inline evutil_socket_t next_fd()
 {
     int res = 0;    // stdin like an arror
-    //sock_list_mutex.lock();
     if (!sock_list.empty()) {
-        //res = sock_list.back();
-        //sock_list.pop_back();
         res = sock_list.pop();
     }
-    //sock_list_mutex.unlock();
     return res;
 }
 
@@ -151,20 +147,13 @@ static void *thread_func(void*)
         cerr << "Could not initialize event_base in thread!\n";
         return NULL;
     }
-//    while(true) {
-//        event_base_loop(base, EVLOOP_ONCE);
-
-//        if (evutil_socket_t fd = next_fd()) {
-//            accept_conn_cb(NULL, fd, NULL, 0 , (void*)base);
-//        }
-//        nanosleep(&nts, &some);
-//    }
-    int fd = 0;
-    while(1) {
+    while(true) {
         event_base_loop(base, EVLOOP_ONCE);
-        if(sock_list.pop(fd)){
-             accept_conn_cb(NULL, fd, NULL, 0 , (void*)base);
+
+        if (evutil_socket_t fd = next_fd()) {
+            accept_conn_cb(NULL, fd, NULL, 0 , (void*)base);
         }
+        nanosleep(&nts, &some);
     }
     cerr << "Thread: Unexpected loop exit!\n";
     return NULL;
