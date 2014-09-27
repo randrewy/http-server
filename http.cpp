@@ -6,7 +6,6 @@ const char* FORBIDDEN_MSG = "403 Forbidden";
 const int   FORBIDDEN_LEN = 13;
 const char* NOT_FOUND_MSG = "404 Not found";
 const int   NOT_FOUND_LEN = 13;
-const char* CRLF = "\r\n";
 
 const RequestInfo RequestInfo::BAD_REQUEST = RequestInfo(UNSUPPORTED, "");
 
@@ -192,9 +191,6 @@ void writeResponse(bufferevent *bev, const char* path, RequestMethod method)
     writeHeader(bev, OK, getMappedContentType(full_path), st.st_size);
     if(method == GET) {
         evbuffer_add_file(output, fd, 0, st.st_size);
-    } else {
-        // ctime gives only /n so we'll add proper CRLF
-        evbuffer_add(output, CRLF, 2);
     }
 }
 
