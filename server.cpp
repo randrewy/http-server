@@ -2,14 +2,9 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <list>
-#include <boost/lockfree/queue.hpp>
 using namespace std;
 
-static void * thread_func(void *vptr_args);
-
-boost::lockfree::queue<evutil_socket_t> sock_list(1<<12);
-
-void conn_eventcb(bufferevent *bev, short events, void*)
+static void conn_eventcb(bufferevent *bev, short events, void*)
 {
     if (events & BEV_EVENT_ERROR) {
         cerr << "Error from bufferevent";
@@ -19,7 +14,7 @@ void conn_eventcb(bufferevent *bev, short events, void*)
     }
 }
 
-void conn_writecb(bufferevent *bev, void*)
+static void conn_writecb(bufferevent *bev, void*)
 {
     struct evbuffer *output = bufferevent_get_output(bev);
     if (evbuffer_get_length(output) == 0 && BEV_EVENT_EOF ) {
@@ -27,7 +22,7 @@ void conn_writecb(bufferevent *bev, void*)
     }
 }
 
-void conn_readcb(bufferevent *bev, void*)
+static void conn_readcb(bufferevent *bev, void*)
 {
     createResponse(bev);
 
@@ -36,7 +31,7 @@ void conn_readcb(bufferevent *bev, void*)
 
 }
 
-void accept_conn_cb( evconnlistener*, evutil_socket_t fd, sockaddr*, int, void *data)
+static void accept_conn_cb( evconnlistener*, evutil_socket_t fd, sockaddr*, int, void *data)
 {
     event_base *base = static_cast<event_base*>(data);
     bufferevent *bev = bufferevent_socket_new(base, fd, BEV_OPT_CLOSE_ON_FREE);
@@ -53,12 +48,7 @@ void accept_conn_cb( evconnlistener*, evutil_socket_t fd, sockaddr*, int, void *
     }
 }
 
-void accept_conn_cb_main (evconnlistener*, evutil_socket_t fd, sockaddr*, int, void*)
-{
-    sock_list.push(fd);
-}
-
-void accept_error_cb(evconnlistener *listener, void*)
+static void accept_error_cb(evconnlistener *listener, void*)
 {
     event_base *base = evconnlistener_get_base(listener);
     int error = EVUTIL_SOCKET_ERROR();
@@ -67,7 +57,7 @@ void accept_error_cb(evconnlistener *listener, void*)
     event_base_loopexit(base, NULL);
 }
 
-int server::start(unsigned int port, int threads)
+int server::start(unsigned int port, int workers)
 {
     cout << "Hello from " << SERVER <<"! Current time: ";
     const time_t timer = time(NULL);
@@ -88,7 +78,7 @@ int server::start(unsigned int port, int threads)
     sin.sin_addr.s_addr = htonl(INADDR_ANY);
     sin.sin_family = AF_INET;
 
-    listener = evconnlistener_new_bind(base, accept_conn_cb_main, base, LISTENER_OPTS,
+    listener = evconnlistener_new_bind(base, accept_conn_cb, base, LISTENER_OPTS,
                         BACKLOG, reinterpret_cast<sockaddr*>(&sin), sizeof(sin));
 
     if (!listener) {
@@ -99,54 +89,36 @@ int server::start(unsigned int port, int threads)
     evconnlistener_set_error_cb(listener, accept_error_cb);
     cout << "Listen started on port " << port <<".\n";
 
-    if (threads > 0) {
-        pthread_t thread[threads];
-        for(int i = 0; i < threads; ++i) {
-            pthread_create(&thread[i], NULL, thread_func, NULL);
+    if (workers > 0) {
+        for(int i = 0; i < workers; ++i) {
+            pid_t pid;
+            switch((pid = fork())) {
+            case -1:
+                cerr << "error on fork()!\n";
+                abort();
+            case 0:
+                cout << "Subprocess " << i << " (" << pid << ") created.\n";
+                event_reinit(base);
+                cout << "Dispatching from worker " << i << "\n";
+                event_base_dispatch(base);
+
+                break;
+            default:
+                if (i == workers - 1) {
+                    event_reinit(base);
+                    cout << "Dispatching from master\n";
+                    event_base_dispatch(base);
+                }
+                break;
+           }
         }
-        cout << "Dispatching\n";
-        event_base_dispatch(base);
     } else {
-        cerr << "No worker threads!\n";
+        cerr << "No worker subproceses!\n";
     }
+
 
     evconnlistener_free(listener);
     event_base_free(base);
     cout << "exiting...\n";
     return 0;
 }
-
-inline evutil_socket_t next_fd()
-{
-    int res = 0;    // stdin like an arror
-    sock_list.pop(res);
-    return res;
-}
-
-static void *thread_func(void*)
-{
-    //event_config* cfg = event_config_new();
-    //event_config_set_flag(cfg, EVENT_BASE_FLAG_NOLOCK );
-    //event_config_set_flag(cfg, EVENT_BASE_FLAG_EPOLL_USE_CHANGELIST );
-    //event_base *base = event_base_new_with_config(cfg);
-    event_base *base = event_base_new();
-
-    timespec nts = {0, 32};
-    timespec some = {0, 32};
-
-    if (!base) {
-        cerr << "Could not initialize event_base in thread!\n";
-        return NULL;
-    }
-    while(true) {
-        event_base_loop(base, EVLOOP_ONCE);
-
-        if (evutil_socket_t fd = next_fd()) {
-            accept_conn_cb(NULL, fd, NULL, 0 , (void*)base);
-        }
-        nanosleep(&nts, &some);
-    }
-    cerr << "Thread: Unexpected loop exit!\n";
-    return NULL;
-}
-
