@@ -90,7 +90,7 @@ int server::start(unsigned int port, int workers)
     cout << "Listen started on port " << port <<".\n";
 
     if (workers > 0) {
-        for(int i = 0; i < workers; ++i) {
+        for(int i = 1; i < workers; ++i) {
             pid_t pid;
             switch((pid = fork())) {
             case -1:
@@ -102,13 +102,8 @@ int server::start(unsigned int port, int workers)
                 cout << "Dispatching from worker " << i << "\n";
                 event_base_dispatch(base);
 
-                break;
+                return -1;
             default:
-                if (i == workers - 1) {
-                    event_reinit(base);
-                    cout << "Dispatching from master\n";
-                    event_base_dispatch(base);
-                }
                 break;
            }
         }
@@ -116,6 +111,9 @@ int server::start(unsigned int port, int workers)
         cerr << "No worker subproceses!\n";
     }
 
+    event_reinit(base);
+    cout << "Dispatching from master\n";
+    event_base_dispatch(base);
 
     evconnlistener_free(listener);
     event_base_free(base);
